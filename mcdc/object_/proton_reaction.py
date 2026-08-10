@@ -94,7 +94,7 @@ class ProtonReactionElasticScattering(ProtonReactionBase):
     # Annotations for Numba mode
     label: str = "proton_elastic_scattering_reaction"
     #
-    mu_table: DistributionBase
+    mu_table: DistributionMultiTable
 
     def __init__(self, MT, xs, xs_offset, reference_frame, mu):
         type_ = PROTON_REACTION_ELASTIC_SCATTERING
