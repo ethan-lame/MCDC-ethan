@@ -13,11 +13,17 @@ import ACEtk
 # -- Constants -----------------------------------------------------------------
 
 ZAP_NAMES = {
-    1:  "neutron",
-    31: "deuteron",
-    32: "triton",
-    33: "He3",
-    34: "alpha",
+    1:    "neutron",
+    1001: "proton",
+    1002: "deuteron",
+    1003: "triton",
+    2003: "He3",
+    2004: "alpha",
+    # Retain the short forms used by some legacy ACE tables.
+    31:   "deuteron",
+    32:   "triton",
+    33:   "He3",
+    34:   "alpha",
 }
 
 Z_TO_SYMBOL = {
@@ -335,6 +341,7 @@ def load_secondary_particles(ace_table, file, verbose=False):
 
             mt = zap_group.create_group(f"MT-{MT:03}")
             mt.attrs["MT"]              = MT
+            mt.attrs["ZAP"]             = zap
             mt.attrs["multiplicity"]    = nu
             mt.attrs["reference_frame"] = rf
 
@@ -384,6 +391,13 @@ def load_secondary_particles(ace_table, file, verbose=False):
                     )
                 except Exception:
                     pass
+
+            # Keep the ACE-oriented index above, while also exposing each
+            # product directly beneath its reaction for runtime loading.
+            reaction_path = f"proton_reactions/inelastic_scattering/MT-{MT:03}"
+            if reaction_path in file:
+                products = file.require_group(f"{reaction_path}/secondary_products")
+                products[f"ZAP_{zap}"] = mt
 
 
 # -- Per-file processing -------------------------------------------------------

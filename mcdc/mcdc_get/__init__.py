@@ -88,6 +88,8 @@ import mcdc.mcdc_get.proton_elastic_scattering_reaction as proton_elastic_scatte
 
 import mcdc.mcdc_get.proton_inelastic_scattering_reaction as proton_inelastic_scattering_reaction
 
+import mcdc.mcdc_get.proton_secondary_product as proton_secondary_product
+
 import mcdc.mcdc_get.collision_data as collision_data
 
 import mcdc.mcdc_get.particle_bank as particle_bank

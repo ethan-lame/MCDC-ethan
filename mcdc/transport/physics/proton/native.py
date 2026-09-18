@@ -2,6 +2,7 @@ import math
 import numpy as np
 from numba import njit
 import time
+import os
 
 ####
 
@@ -31,6 +32,11 @@ from mcdc.constant import (
     PARTICLE_ELECTRON,
     PARTICLE_NEUTRON,
     PARTICLE_PROTON,
+    PARTICLE_DEUTERON,
+    PARTICLE_TRITON,
+    PARTICLE_HE3,
+    PARTICLE_ALPHA,
+    PARTICLE_HEAVY,
     PROTON_CUTOFF_ENERGY,
 )
 from mcdc.transport.data import evaluate_data
@@ -401,18 +407,13 @@ def capture(
 @njit
 def elastic_scattering(
     reaction, particle_container, collision_data_container, nuclide, simulation, data
-):
-
-    # print(f'reaction = {repr(reaction)}')
-    # print(f'{reaction.dtype.names}')
-    # print(f'{reaction["mu_table_ID"]}, {reaction["ID"]}, {reaction["parent_ID"]}')
-    
-    # print(f'particle undergoing elastic scattering')
+):    
     particle = particle_container[0]
     collision_data = collision_data_container[0]
 
     # Particle attributes
     E = particle["E"]
+    incoming_energy = E
     ux = particle["ux"]
     uy = particle["uy"]
     uz = particle["uz"]
@@ -463,11 +464,8 @@ def elastic_scattering(
     uz = vz / speed
 
     # # Sample the scattering cosine from the multi-PDF distribution
-    # print(f'simulation = {simulation}, names = {simulation.dtype.names}')
-    # print(f'reaction = {reaction}, names = {reaction.dtype.names}')
     multi_table = simulation["multi_table_distributions"][reaction["mu_table_ID"]]
     mu0 = sample_multi_table(E, particle_container, multi_table, simulation, data)
-
     # Scatter the direction in COM
     azi = 2.0 * PI * rng.lcg(particle_container)
     ux_new, uy_new, uz_new = scatter_direction(ux, uy, uz, mu0, azi)
@@ -489,6 +487,11 @@ def elastic_scattering(
     # Final energy - LAB
     speed = math.sqrt(vx * vx + vy * vy + vz * vz)
     particle["E"] = particle_energy_from_speed(speed)
+    outgoing_energy = particle["E"]
+
+    # filepath = "/home/ethan_lame/MCDC/examples/proton_beam"
+    # with open(f"{filepath}/distribution_file.txt", "a") as f:
+    #     f.write(f"{mu0:.5f}, {incoming_energy}, {outgoing_energy}\n")
 
     # Final direction - LAB
     particle["ux"] = vx / speed
@@ -557,15 +560,9 @@ def sample_nucleus_velocity(A, particle_container):
 def inelastic_scattering(
     reaction, particle_container, collision_data_container, nuclide, program, data
 ):
-    # """
-    # Proton intelastic scattering with secondary particle production.
 
-    # Samples:
-    # 1. Outgoing proton from proton_reactions/inelastic_scattering/MT-005
-    # 2. Secondary particles from secondary_particles/ZAP_x/MT-005
-    # """
-    # print(f'particle undergoing inelastic scattering')
-
+    # print(f'undergoing an inelastic_scatter with reaction {reaction}\n{reaction.dtype.names}')
+    
     simulation = util.access_simulation(program)
     particle = particle_container[0]
     collision_data = collision_data_container[0]
@@ -716,7 +713,75 @@ def inelastic_scattering(
     # ===========================================================================
     # 2. Sample SECONDARY PARTICLES from secondary_particles groups
     # ===========================================================================
-    # TODO: Add secondary particle sampling
+    for i in range(reaction["N_secondary_product"]):
+        product_ID = int(
+            mcdc_get.proton_inelastic_scattering_reaction.secondary_product_IDs(
+                i, reaction, data
+            )
+        )
+        product = simulation["proton_secondary_products"][product_ID]
+
+        # The primary proton above is sampled from the reaction's primary
+        # energy-angle distribution. Do not create it a second time here.
+        if product["particle_type"] == PARTICLE_PROTON:
+            continue
+
+        particle_container_new = util.local_array(1, type_.particle_data)
+        particle_module.copy_as_child(particle_container_new, particle_container)
+
+        if product["angle_type"] == ANGLE_ENERGY_CORRELATED:
+            E_new, mu = sample_correlated_distribution_with_scale(
+                E,
+                simulation["distributions"][product["energy_ID"]],
+                particle_container_new,
+                simulation,
+                data,
+            )
+        else:
+            E_new = sample_distribution_with_scale(
+                E,
+                simulation["distributions"][product["energy_ID"]],
+                particle_container_new,
+                simulation,
+                data,
+            )
+            if product["angle_type"] == ANGLE_ISOTROPIC:
+                mu = sample_isotropic_cosine(particle_container_new)
+            else:
+                multi_table = simulation["multi_table_distributions"][
+                    product["mu_ID"]
+                ]
+                mu = sample_multi_table(
+                    E, particle_container_new, multi_table, simulation, data
+                )
+
+        if product["reference_frame"] == REFERENCE_FRAME_COM:
+            A = nuclide["atomic_weight_ratio"]
+            E_COM = E_new
+            E_new = (
+                E_COM
+                + (E + 2.0 * mu * (A + 1.0) * math.sqrt(E * E_COM))
+                / (A + 1.0) ** 2
+            )
+            mu = mu * math.sqrt(E_COM / E_new) + math.sqrt(E / E_new) / (A + 1.0)
+
+        azi = 2.0 * PI * rng.lcg(particle_container_new)
+        ux_new, uy_new, uz_new = scatter_direction(ux, uy, uz, mu, azi)
+        product_type = product["particle_type"]
+
+        if product_type in (PARTICLE_NEUTRON, PARTICLE_ELECTRON):
+            particle_new = particle_container_new[0]
+            particle_new["ux"] = ux_new
+            particle_new["uy"] = uy_new
+            particle_new["uz"] = uz_new
+            particle_new["E"] = E_new
+            particle_new["particle_type"] = product_type
+            particle_bank_module.bank_active_particle(particle_container_new, program)
+        else:
+            # Deuterons, tritons, He3, alphas, and heavier products are
+            # retained in the data model but locally deposited for now.
+            collision_data["energy_deposition"] += E_new * w
+
 
 
 # No fission for protons

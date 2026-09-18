@@ -555,8 +555,21 @@ proton_inelastic_scattering_reaction = into_dtype([
     ('spectrum_probability_length', int64),
     ('N_energy_spectrum', int64),
     ('energy_spectrum_IDs_offset', int64),
+    ('N_secondary_product', int64),
+    ('secondary_product_IDs_offset', int64),
     ('ID', int64),
     ('parent_ID', int64),
+])
+
+proton_secondary_product = into_dtype([
+    ('zap', int64),
+    ('particle_type', int64),
+    ('multiplicity', int64),
+    ('angle_type', int64),
+    ('reference_frame', int64),
+    ('energy_ID', int64),
+    ('mu_ID', int64),
+    ('ID', int64),
 ])
 
 collision_data = into_dtype([
@@ -887,6 +900,8 @@ def set_simulation(N: dict):
         ('N_proton_inelastic_scattering_reaction', int64),
         ('proton_reactions', proton_reaction, (N['proton_reaction'])),
         ('N_proton_reaction', int64),
+        ('proton_secondary_products', proton_secondary_product, (N['proton_secondary_product'])),
+        ('N_proton_secondary_product', int64),
         ('cells', cell, (N['cell'])),
         ('N_cell', int64),
         ('lattices', lattice, (N['lattice'])),

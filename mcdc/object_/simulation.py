@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from mcdc.object_.nuclide import Nuclide
     from mcdc.object_.neutron_reaction import NeutronReactionBase
     from mcdc.object_.proton_reaction import ProtonReactionBase
+    from mcdc.object_.proton_reaction import ProtonSecondaryProduct
     from mcdc.object_.source import Source
     from mcdc.object_.surface import Surface
     from mcdc.object_.tally import Tally
@@ -66,6 +67,7 @@ class Simulation(ObjectSingleton):
     neutron_reactions: list[NeutronReactionBase]
     sources: list[Source]
     proton_reactions: list[ProtonReactionBase]
+    proton_secondary_products: list[ProtonSecondaryProduct]
 
     # Geometry
     cells: list[Cell]
@@ -153,6 +155,7 @@ class Simulation(ObjectSingleton):
         self.neutron_reactions = []
         self.sources = []
         self.proton_reactions = []
+        self.proton_secondary_products = []
 
         # Geometry
         self.cells = []

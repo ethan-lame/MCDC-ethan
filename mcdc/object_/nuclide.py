@@ -22,6 +22,7 @@ from mcdc.object_.proton_reaction import (
     ProtonReactionElasticScattering,
     ProtonReactionInelasticScattering,
     ProtonReactionCapture,
+    ProtonSecondaryProduct,
     set_energy_distribution,
 )
 from mcdc.object_.simulation import simulation
