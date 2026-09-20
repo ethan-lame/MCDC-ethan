@@ -21,13 +21,9 @@ from mcdc.constant import (
     PARTICLE_NEUTRON,
     PARTICLE_PROTON,
     PARTICLE_ELECTRON,
-    PARTICLE_DEUTERON,
-    PARTICLE_TRITON,
-    PARTICLE_HE3,
-    PARTICLE_ALPHA,
-    PARTICLE_HEAVY,
+    PARTICLE_ANY,
 )
-from mcdc.object_.base import ObjectNonSingleton, ObjectPolymorphic
+from mcdc.object_.base import MCDCObject, MCDCPolymorphic
 from mcdc.object_.distribution import (
     DistributionBase,
     DistributionMultiTable,
@@ -38,7 +34,6 @@ from mcdc.object_.distribution import (
     DistributionTabulatedEnergyAngle,
     DistributionNBody,
 )
-from mcdc.object_.simulation import simulation
 from mcdc.print_ import print_1d_array, print_error
 
 # ======================================================================================
@@ -46,9 +41,10 @@ from mcdc.print_ import print_1d_array, print_error
 # ======================================================================================
 
 
-class ProtonReactionBase(ObjectPolymorphic):
+class ProtonReactionBase(MCDCPolymorphic):
     # Annotations for Numba mode
     label: str = "proton_reaction"
+    sub_type = -1  # Polymorphic base
     #
     MT: int
     xs: NDArray[float64]
@@ -56,18 +52,16 @@ class ProtonReactionBase(ObjectPolymorphic):
     reference_frame: int
     q_value: float64
 
-    def __init__(self, type_, MT, xs, xs_offset, reference_frame, q_value):
+    def __init__(self, MT, xs, xs_offset, reference_frame, q_value):
+        super().__init__()
         self.MT = MT
         self.xs = xs
         self.xs_offset_ = xs_offset
         self.reference_frame = reference_frame
         self.q_value = q_value
-        super().__init__(type_)
 
     def __repr__(self):
-        text = "\n"
-        text += f"{decode_type(self.type)}\n"
-        text += f"  - ID: {self.ID}\n"
+        text = super().__repr__()
         text += f"  - MT: {self.MT}\n"
         text += f"  - XS {print_1d_array(self.xs)} barn\n"
         text += f"  - Reference frame: {decode_reference_frame(self.reference_frame)}\n"
@@ -99,18 +93,20 @@ def decode_reference_frame(type_):
 class ProtonReactionElasticScattering(ProtonReactionBase):
     # Annotations for Numba mode
     label: str = "proton_elastic_scattering_reaction"
+    sub_type = PROTON_REACTION_ELASTIC_SCATTERING
     #
     mu_table: DistributionMultiTable
 
     def __init__(self, MT, xs, xs_offset, reference_frame, mu):
-        type_ = PROTON_REACTION_ELASTIC_SCATTERING
+        super().__init__(MT, xs, xs_offset, reference_frame, 0.0)
         self.mu_table = mu
-        super().__init__(type_, MT, xs, xs_offset, reference_frame, 0.0)
 
     @classmethod
-    def from_h5_group(cls, h5_group):
+    def from_h5_group(cls, h5_group, simulation):
         MT, xs, xs_offset, reference_frame, _ = set_basic_properties(h5_group)
-        _, mu = set_angular_distribution(h5_group["angular_cosine_distribution"])
+        _, mu = set_angular_distribution(
+            h5_group["angular_cosine_distribution"], simulation
+        )
         return cls(MT, xs, xs_offset, reference_frame, mu)
     
     def __repr__(self):
@@ -128,18 +124,10 @@ def particle_type_from_zap(zap):
     return {
         1: PARTICLE_NEUTRON,
         1001: PARTICLE_PROTON,
-        1002: PARTICLE_DEUTERON,
-        1003: PARTICLE_TRITON,
-        2003: PARTICLE_HE3,
-        2004: PARTICLE_ALPHA,
-        31: PARTICLE_DEUTERON,
-        32: PARTICLE_TRITON,
-        33: PARTICLE_HE3,
-        34: PARTICLE_ALPHA,
-    }.get(zap, PARTICLE_HEAVY)
+    }.get(zap, PARTICLE_ANY)
 
 
-class ProtonSecondaryProduct(ObjectNonSingleton):
+class ProtonSecondaryProduct(MCDCObject):
     label: str = "proton_secondary_product"
     zap: int
     particle_type: int
@@ -150,6 +138,7 @@ class ProtonSecondaryProduct(ObjectNonSingleton):
     mu: DistributionBase
 
     def __init__(self, zap, multiplicity, reference_frame, energy, angle_type, mu):
+        super().__init__()
         self.zap = zap
         self.particle_type = particle_type_from_zap(zap)
         self.multiplicity = multiplicity
@@ -157,10 +146,9 @@ class ProtonSecondaryProduct(ObjectNonSingleton):
         self.energy = energy
         self.angle_type = angle_type
         self.mu = mu
-        super().__init__()
 
 
-def set_secondary_product(h5_group):
+def set_secondary_product(h5_group, simulation):
     zap = int(h5_group.attrs["ZAP"])
     multiplicity = int(h5_group.attrs.get("multiplicity", 1))
     reference_frame = h5_group.attrs.get("reference_frame", "LAB")
@@ -179,11 +167,15 @@ def set_secondary_product(h5_group):
     if "angular_cosine_distribution" in h5_group:
         angular_group = h5_group["angular_cosine_distribution"]
         if angular_group.attrs.get("type", "isotropic") == "given_in_energy_distribution":
-            angle_type, mu = set_angular_distribution_from_kalbach_mann(energy_group)
+            angle_type, mu = set_angular_distribution_from_kalbach_mann(
+                energy_group, simulation
+            )
         else:
-            angle_type, mu = set_angular_distribution(angular_group)
+            angle_type, mu = set_angular_distribution(angular_group, simulation)
     elif energy_group.attrs.get("type") == "kalbach-mann":
-        angle_type, mu = set_angular_distribution_from_kalbach_mann(energy_group)
+        angle_type, mu = set_angular_distribution_from_kalbach_mann(
+            energy_group, simulation
+        )
     else:
         angle_type, mu = ANGLE_ISOTROPIC, simulation.distributions[0]
 
@@ -195,6 +187,7 @@ def set_secondary_product(h5_group):
 class ProtonReactionInelasticScattering(ProtonReactionBase):
     # Annotations for Numba mode
     label: str = "proton_inelastic_scattering_reaction"
+    sub_type = PROTON_REACTION_INELASTIC_SCATTERING
     #
     multiplicity: int
     angle_type: int
@@ -223,8 +216,7 @@ class ProtonReactionInelasticScattering(ProtonReactionBase):
         energy_spectra,
         secondary_products,
     ):
-        type_ = PROTON_REACTION_INELASTIC_SCATTERING
-        super().__init__(type_, MT, xs, xs_offset, reference_frame, q_value)
+        super().__init__(MT, xs, xs_offset, reference_frame, q_value)
 
         self.multiplicity = multiplicity
         self.angle_type = angle_type
@@ -237,18 +229,18 @@ class ProtonReactionInelasticScattering(ProtonReactionBase):
         self.secondary_products = secondary_products
 
     @classmethod
-    def from_h5_group(cls, h5_group):
+    def from_h5_group(cls, h5_group, simulation):
         MT, xs, xs_offset, reference_frame, q_value = set_basic_properties(h5_group)
         multiplicity = int(h5_group["multiplicity"][()])
 
         ang_type_str = h5_group["angular_cosine_distribution"].attrs.get("type", "isotropic")
         if ang_type_str == "given_in_energy_distribution":
             angle_type, mu = set_angular_distribution_from_kalbach_mann(
-                h5_group["energy_spectrum-1"]
+                h5_group["energy_spectrum-1"], simulation
             )
         else:
             angle_type, mu = set_angular_distribution(
-                h5_group["angular_cosine_distribution"]
+                h5_group["angular_cosine_distribution"], simulation
             )
 
         spectrum_probability_grid = h5_group["spectrum_probability_grid"][()] * 1e6
@@ -261,7 +253,7 @@ class ProtonReactionInelasticScattering(ProtonReactionBase):
         if "secondary_products" in h5_group:
             for product_name in sorted(h5_group["secondary_products"]):
                 product = set_secondary_product(
-                    h5_group["secondary_products"][product_name]
+                    h5_group["secondary_products"][product_name], simulation
                 )
                 multiplicity = product.multiplicity
                 product.multiplicity = 1
@@ -290,13 +282,13 @@ class ProtonReactionInelasticScattering(ProtonReactionBase):
 class ProtonReactionCapture(ProtonReactionBase):
     # Annotations for Numba mode
     label: str = "proton_capture_reaction"
+    sub_type = PROTON_REACTION_CAPTURE
 
     def __init__(self, MT, xs, xs_offset, reference_frame, q_value):
-        type_ = PROTON_REACTION_CAPTURE
-        super().__init__(type_, MT, xs, xs_offset, reference_frame, q_value)
+        super().__init__(MT, xs, xs_offset, reference_frame, q_value)
 
     @classmethod
-    def from_h5_group(cls, h5_group):
+    def from_h5_group(cls, h5_group, simulation):
         MT, xs, xs_offset, reference_frame, q_value = set_basic_properties(h5_group)
         return cls(MT, xs, xs_offset, reference_frame, q_value)
 
@@ -320,7 +312,7 @@ def set_basic_properties(h5_group):
     return MT, xs, xs_offset, reference_frame, q_value
 
 
-def set_angular_distribution(h5_group):
+def set_angular_distribution(h5_group, simulation):
     # Handle missing type attribute
     if "type" not in h5_group.attrs:
         mu_type = "isotropic"
@@ -383,7 +375,7 @@ def set_angular_distribution(h5_group):
 
     return angle_type, mu
 
-def set_angular_distribution_from_kalbach_mann(spectrum_group):
+def set_angular_distribution_from_kalbach_mann(spectrum_group, simulation):
     """
     Build a DistributionMultiTable for Kalbach-Mann angular sampling.
     The 'value' array holds the angular slope 'a'. The transport kernel 

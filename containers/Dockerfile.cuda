@@ -1,6 +1,6 @@
 FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
 
-LABEL org.opencontainers.image.source="https://github.com/CEMeNT-PSAAP/MCDC"
+LABEL org.opencontainers.image.source="https://github.com/mcdc-project/mcdc"
 LABEL org.opencontainers.image.description="MC/DC: Monte Carlo Dynamic Code (CUDA/GPU)"
 LABEL org.opencontainers.image.licenses="BSD-3-Clause"
 
@@ -27,16 +27,16 @@ RUN wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Mi
 
 ENV PATH="/opt/conda/bin:$PATH"
 
-# Install Python environment (matching Harmonize prereqs: CUDA=11.8, Numba>=0.60.0)
+# Install Python environment (matching Harmonize prerequisites: CUDA 11.8 and Numba 0.61 or newer)
 RUN conda install -y \
     gxx \
-    python=3.11 \
+    python=3.13 \
     numba \
     numpy \
     && conda clean -afy
 
 # Install mpi4py
-RUN pip install --no-cache-dir mpi4py
+RUN pip install --no-cache-dir "mpi4py<4.2"
 
 # Install Harmonize (NVIDIA GPU runtime for MC/DC)
 RUN git clone https://github.com/CEMeNT-PSAAP/harmonize.git /opt/harmonize \

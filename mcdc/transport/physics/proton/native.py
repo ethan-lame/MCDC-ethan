@@ -32,11 +32,11 @@ from mcdc.constant import (
     PARTICLE_ELECTRON,
     PARTICLE_NEUTRON,
     PARTICLE_PROTON,
-    PARTICLE_DEUTERON,
-    PARTICLE_TRITON,
-    PARTICLE_HE3,
-    PARTICLE_ALPHA,
-    PARTICLE_HEAVY,
+    # PARTICLE_DEUTERON,
+    # PARTICLE_TRITON,
+    # PARTICLE_HE3,
+    # PARTICLE_ALPHA,
+    # PARTICLE_HEAVY,
     PROTON_CUTOFF_ENERGY,
 )
 from mcdc.transport.data import evaluate_data
@@ -83,16 +83,16 @@ def particle_energy_from_speed(speed):
 @njit
 def macro_xs(reaction_type, particle_container, simulation, data):
     particle = particle_container[0]
-    material = simulation["native_materials"][particle["material_ID"]]
+    material = simulation["materials"][particle["material_ID"]]
     E = particle["E"]
 
     total = 0.0
 
     for i in range(material["N_nuclide"]):
-        nuclide_ID = int(mcdc_get.native_material.nuclide_IDs(i, material, data))
+        nuclide_ID = int(mcdc_get.material.nuclide_IDs(i, material, data))
         nuclide = simulation["nuclides"][nuclide_ID]
 
-        nuclide_density = mcdc_get.native_material.nuclide_densities(i, material, data)
+        nuclide_density = mcdc_get.material.nuclide_densities(i, material, data)
         xs = total_micro_xs(reaction_type, E, nuclide, data)
 
         total += nuclide_density * xs
@@ -197,7 +197,7 @@ def collision(particle_container, collision_data_container, program, data):
     simulation = util.access_simulation(program)
     particle = particle_container[0]
     collision_data = collision_data_container[0]
-    material = simulation["native_materials"][particle["material_ID"]]
+    material = simulation["materials"][particle["material_ID"]]
 
     # Particle properties
     E = particle["E"]
@@ -219,10 +219,10 @@ def collision(particle_container, collision_data_container, program, data):
     xi = rng.lcg(particle_container) * SigmaT
     total = 0.0
     for i in range(material["N_nuclide"]):
-        nuclide_ID = int(mcdc_get.native_material.nuclide_IDs(i, material, data))
+        nuclide_ID = int(mcdc_get.material.nuclide_IDs(i, material, data))
         nuclide = simulation["nuclides"][nuclide_ID]
 
-        nuclide_density = mcdc_get.native_material.nuclide_densities(i, material, data)
+        nuclide_density = mcdc_get.material.nuclide_densities(i, material, data)
         sigmaT = total_micro_xs(PROTON_REACTION_TOTAL, E, nuclide, data)
 
         SigmaT_nuclide = nuclide_density * sigmaT
@@ -270,7 +270,7 @@ def collision(particle_container, collision_data_container, program, data):
                 return 
 
     # Capture
-    if not simulation["implicit_capture"]["active"]:
+    if not simulation["technique"]["implicit_capture"]["active"]:
         # print(f'particle being captured')
         sigma_capture = total_micro_xs(PROTON_REACTION_CAPTURE, E, nuclide, data)
         total += sigma_capture
@@ -334,7 +334,7 @@ def collision(particle_container, collision_data_container, program, data):
 def csda_edep(particle_container, collision_data_container, distance, simulation, data):
     particle = particle_container[0]
     collision_data = collision_data_container[0]
-    material = simulation["native_materials"][particle["material_ID"]]
+    material = simulation["materials"][particle["material_ID"]]
     E = particle["E"]
     
     # Check for cutoff energy
@@ -861,7 +861,7 @@ def rotate_direction(particle, phi, theta):
 @njit
 def calculate_total_stopping_power(particle_container, simulation, data):
     particle = particle_container[0]
-    material = simulation["native_materials"][particle["material_ID"]]
+    material = simulation["materials"][particle["material_ID"]]
     E = particle["E"]
 
     total_stopping_power = 0.0
@@ -870,7 +870,7 @@ def calculate_total_stopping_power(particle_container, simulation, data):
     total_A = 0.0
     # Find the total stopping power by summing over every nuclide in the material
     for i in range(material["N_nuclide"]):
-        nuclide_ID = int(mcdc_get.native_material.nuclide_IDs(i, material, data))
+        nuclide_ID = int(mcdc_get.material.nuclide_IDs(i, material, data))
         nuclide = simulation["nuclides"][nuclide_ID]
 
         # If no stopping power provided, we calculate it ourselves here
@@ -884,7 +884,7 @@ def calculate_total_stopping_power(particle_container, simulation, data):
 
         # Convert atoms/barn-cm to g/cm3:
         atomic_mass = nuclide["atomic_weight_ratio"]  # mass in amu
-        nuclide_density = mcdc_get.native_material.nuclide_densities(i, material, data)
+        nuclide_density = mcdc_get.material.nuclide_densities(i, material, data)
         density_gcm3 = nuclide_density * 1e24 * atomic_mass / (6.022e23)
         total_rho_gcm3 += density_gcm3
 
@@ -895,8 +895,8 @@ def calculate_total_stopping_power(particle_container, simulation, data):
     average_A = total_A / material["N_nuclide"]
 
     if material["stopping_power_provided"]:
-        dedx_values = mcdc_get.native_material.stopping_power_all(material, data)
-        dedx_energies = mcdc_get.native_material.stopping_power_energy_grid_all(material, data)
+        dedx_values = mcdc_get.material.stopping_power_all(material, data)
+        dedx_energies = mcdc_get.material.stopping_power_energy_grid_all(material, data)
 
         dedx = np.interp(E / 1e6, dedx_energies, dedx_values)
         total_stopping_power = dedx * 1e6

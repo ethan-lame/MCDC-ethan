@@ -1,6 +1,6 @@
-FROM python:3.11-slim
+FROM python:3.13-slim
 
-LABEL org.opencontainers.image.source="https://github.com/CEMeNT-PSAAP/MCDC"
+LABEL org.opencontainers.image.source="https://github.com/mcdc-project/mcdc"
 LABEL org.opencontainers.image.description="MC/DC: Monte Carlo Dynamic Code"
 LABEL org.opencontainers.image.licenses="BSD-3-Clause"
 
@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /opt/mcdc
 COPY pyproject.toml .
-RUN pip install --no-cache-dir mpi4py
+RUN pip install --no-cache-dir "mpi4py<4.2"
 COPY . .
 
 ENV SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0
