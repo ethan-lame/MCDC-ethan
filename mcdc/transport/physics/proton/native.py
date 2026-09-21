@@ -407,9 +407,11 @@ def capture(
 @njit
 def elastic_scattering(
     reaction, particle_container, collision_data_container, nuclide, simulation, data
-):    
+):
     particle = particle_container[0]
     collision_data = collision_data_container[0]
+    sub_ID = reaction["sub_ID"]
+    elastic_scattering = simulation["proton_elastic_scattering_reactions"][sub_ID]
 
     # Particle attributes
     E = particle["E"]
@@ -463,7 +465,8 @@ def elastic_scattering(
     uy = vy / speed
     uz = vz / speed
 
-    # # Sample the scattering cosine from the multi-PDF distribution
+
+    # mu_distribution = simulation["distributions"][elastic_scattering["mu_table_ID"]]
     multi_table = simulation["multi_table_distributions"][reaction["mu_table_ID"]]
     mu0 = sample_multi_table(E, particle_container, multi_table, simulation, data)
     # Scatter the direction in COM
@@ -605,8 +608,6 @@ def inelastic_scattering(
         # Set default attributes (copy incident proton)
         particle_module.copy_as_child(particle_container_new, particle_container)
 
-
-
         # ==============================================================================
         # Sample angle (if not energy-correlated)
         # ==============================================================================
@@ -619,7 +620,7 @@ def inelastic_scattering(
         elif angle_type == ANGLE_DISTRIBUTED:
             distribution_base = simulation["distributions"][reaction["mu_ID"]]
             multi_table = simulation["multi_table_distributions"][
-                distribution_base["child_ID"]
+                distribution_base["sub_ID"]
             ]
 
             mu = sample_multi_table(E, particle_container, multi_table, simulation, data)

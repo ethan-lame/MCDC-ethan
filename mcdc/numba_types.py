@@ -558,6 +558,7 @@ proton_elastic_scattering_reaction = into_dtype([
     ('mu_table_ID', int64),
     ('ID', int64),
     ('parent_ID', int64),
+    ('sub_ID', int64),
 ])
 
 proton_inelastic_scattering_reaction = into_dtype([
@@ -598,6 +599,7 @@ particle_bank = into_dtype([
     ('tag', 'U32'),
 ])
 
+
 proton_reaction = into_dtype([
     ('MT', int64),
     ('xs_offset', int64),
@@ -606,8 +608,8 @@ proton_reaction = into_dtype([
     ('reference_frame', int64),
     ('q_value', float64),
     ('ID', int64),
-    ('child_type', int64),
-    ('child_ID', int64),
+    ('sub_type', int64),
+    ('sub_ID', int64),
 ])
 
 settings = into_dtype([
